@@ -28,7 +28,10 @@ Na_ready %>% group_by(doublingTimeMinutes) %>% mutate(fraction_avg = (sum(fracti
 
 Na_ready %>% filter(experiment == 'NaCl_stress') %>% ungroup() %>% distinct(Na_mM, carbonSource,.keep_all = TRUE) -> Na_final
 
-Na_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM_Levels),hjust='inward', vjust=1 , size= 5) + geom_abline(intercept =  0.024090421, slope =  0.001617581)
+Na_ready %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+Na_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
 
 coef(lm(fraction_avg ~ generations_per_hour, data = Na_final))
 
+#non-distinct ribosomal fraction NaCl stress
+Na_ready %>% filter(experiment == 'NaCl_stress') %>% ungroup() -> a

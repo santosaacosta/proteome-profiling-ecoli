@@ -26,7 +26,11 @@ Mg_ready %>% group_by(doublingTimeMinutes) %>% mutate(fraction_avg = (sum(fracti
 
 Mg_ready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() %>% distinct(Mg_mM, carbonSource,.keep_all = TRUE) -> Mg_final
 
-Mg_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM_Levels),hjust='inward', vjust=1 , size= 5) + geom_abline(intercept =  0.05359836, slope =  -0.01245900)
+Mg_ready %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+Mg_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
 
 coef(lm(fraction_avg ~ generations_per_hour, data = Mg_final))
 
+Mg_ready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() -> b
+
+b %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 

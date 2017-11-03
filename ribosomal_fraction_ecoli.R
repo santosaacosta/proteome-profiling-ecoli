@@ -31,13 +31,21 @@ fraction %>% left_join(MyData, by = 'media') %>% na.omit() %>% select(-fraction,
 #average the ribosomal fractions of samples that have the same doubling time
 graphready %>% group_by(doublingTimeMinutes) %>% mutate(fraction_avg = (sum(fraction))/n()) -> graphready
 
+#unique fraction averages
 graphready %>% distinct(fraction_avg, .keep_all = TRUE) -> final
 
+#plot of fractions (non-averaged)
+graphready %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
+#plot of unique fraction averages 
 final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
- 
-final_alt <- final[!grepl("stress", final$experiment),]
 
-final_alt %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+#get rid of NaCl and MgSO4 stress 
+final_alt <- final[!grepl("stress", final$experiment),]
+#get rid of NaCl and MgSO4 stress (non-unique fraction_avg)
+final_alt2 <- graphready[!grepl("stress", graphready$experiment),]
+
+final_alt %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+final_alt2 %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
 
 
 

@@ -1,0 +1,182 @@
+---
+title: "Proteome Profiling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+The following code is used to calculate and plot the ribosomal fraction of samples during exponential phase
+```{r}
+
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(stringr)
+library(readr)
+
+resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noMatchFilter_p1Sf_vst <- read_csv("~/Desktop/Wilke Lab/ecoli_multiple_growth_conditions-master/a_results/resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noMatchFilter_p1Sf_vst.csv")
+ 
+nameDictionary_RNA_Protein <- read_csv("~/Desktop/nameDictionary_RNA_Protein.csv")
+
+metaProtein <- read_csv("~/Desktop/Wilke Lab/ecoli_multiple_growth_conditions-master/a_results/metaProtein.csv")
+
+#change the name of columns on data frames to enable joining of tables
+names(nameDictionary_RNA_Protein)[names(nameDictionary_RNA_Protein) == 'b#'] <- 'b'
+names(nameDictionary_RNA_Protein)[names(nameDictionary_RNA_Protein) == 'Protein_id'] <- 'gene_id'
+names(resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noMatchFilter_p1Sf_vst)[names(resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noMatchFilter_p1Sf_vst) == 'X1'] <- 'gene_id'
+
+
+#join normalized data to nameDictionary by gene_id
+resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noMatchFilter_p1Sf_vst %>% left_join(nameDictionary_RNA_Protein, by = 'gene_id') %>% subset(select = -c(mRNA_ID, b)) %>% select(gene_id, gene_name, everything())-> df
+
+df %>% subset(select = (-c(gene_id))) -> df
+
+#sum gene counts for each media, filter only ribosomal genes, sum ribosomal gene counts for each media, calculate ribosomal fraction 
+df %>% gather(media, count, MURI_016:MURI_140) %>% group_by(media) %>% mutate(total= sum(count)) %>% filter(str_detect(gene_name,regex('^rp'))) %>% group_by(media) %>% mutate(ribo = sum(count)) %>% mutate(fraction = ribo/total)-> total_ribo
+
+total_ribo %>% subset(select = -c(gene_name,count, total, ribo )) %>% distinct(fraction) -> fraction 
+
+#select growth condidtions and doubling times, and filter only exponential phase samples
+metaProtein %>% select(growthPhase,carbonSource, dataSet,experiment,growthTime_hr,doublingTimeMinutes,Mg_mM,Na_mM,Mg_mM_Levels,Na_mM_Levels) %>% filter(growthPhase == 'exponential') -> df2
+
+#calculate generations per hour
+df2 %>% mutate(generations_per_hour = ((growthTime_hr*60)/doublingTimeMinutes)/growthTime_hr) -> df2
+
+MyData <- read_csv("~/Desktop/MyData.csv", 
+    col_types = cols(X1 = col_skip()))
+
+#join Mydata (includes growth conditions and generation times) and fraction by sample
+fraction %>% left_join(MyData, by = 'media') %>% na.omit() %>% select(-fraction,fraction)-> graphready
+
+#average the ribosomal fractions of samples that have the same doubling time
+graphready %>% group_by(doublingTimeMinutes) %>% mutate(fraction_avg = (sum(fraction))/n()) -> graphready
+
+#unique fraction averages
+graphready %>% distinct(fraction_avg, .keep_all = TRUE) -> final
+
+#plot of fractions (non-averaged)
+graphready %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
+
+#plot of unique fraction averages 
+final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
+
+#get rid of NaCl and MgSO4 stress 
+final_alt <- final[!grepl("stress", final$experiment),]
+#get rid of NaCl and MgSO4 stress (non-unique fraction_avg)
+final_alt2 <- graphready[!grepl("stress", graphready$experiment),]
+
+final_alt2 %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+
+final_alt %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+Na concentrations and NaCl stress
+```{r}
+
+#keep only ond samples on NaCL stress with unique Na concentrations (5,100,200,300)
+graphready %>% filter(experiment == 'NaCl_stress') %>% ungroup() %>% distinct(Na_mM, carbonSource,.keep_all = TRUE) -> Na_final
+
+graphready %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+Na_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction NaCl stress
+graphready %>% filter(experiment == 'NaCl_stress') %>% ungroup() -> a
+
+a %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+Mg concentrations and MgSO4 stress
+``` {r}
+
+#keep only ond samples on MgSO4 stress with unique Mg concentrations (0.08,0.8,8,200)
+graphready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() %>% distinct(Mg_mM, carbonSource,.keep_all = TRUE) -> Mg_final
+
+graphready %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+Mg_final %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction MgSO4 stress
+graphready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() -> b
+
+b %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+The following code is used to calculate and plot the ribosomal fraction of samples during exponential phase using untransformed data
+
+```{r}
+Untransformed <- read_csv("~/Desktop/GitHub/proteome-profiling-ecoli/umut/resDf_protein_trT_set00_StcYtcNasAgrNgrMgh_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noFilter_p1Sf_noNorm.csv")
+
+names(Untransformed)[names(Untransformed) == 'X1'] <- 'gene_id'
+
+#join untransformed data to nameDictionary by gene_id
+Untransformed %>% left_join(nameDictionary_RNA_Protein, by = 'gene_id') %>% subset(select = -c(mRNA_ID, b)) %>% select(gene_name, everything())-> UTnames
+
+UTnames %>% subset(select = (-c(gene_id))) -> UTnames
+
+#sum gene counts for each media, filter only ribosomal genes, sum ribosomal gene counts for each media, calculate ribosomal fraction 
+UTnames %>% gather(media, count, MURI_016:MURI_140) %>% group_by(media) %>% mutate(total= sum(count)) %>% filter(str_detect(gene_name,regex('^rp'))) %>% group_by(media) %>% mutate(ribo = sum(count)) %>% mutate(fraction = ribo/total)-> UTtotalribo
+
+UTtotalribo %>% subset(select = -c(gene_name,count, total, ribo )) %>% distinct(fraction) -> UTfraction 
+
+#join Mydata (includes growth conditions and generation times) and fraction by sample
+UTfraction %>% left_join(MyData, by = 'media') %>% na.omit() %>% select(-fraction,fraction)-> UTready
+
+#average the ribosomal fractions of samples that have the same doubling time
+UTready %>% group_by(doublingTimeMinutes) %>% mutate(fraction_avg = (sum(fraction))/n()) -> UTready
+
+#unique fraction averages
+UTready %>% distinct(fraction_avg, .keep_all = TRUE) -> UTfinal
+
+#plot of fractions
+UTready %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
+
+#plot of fraction averages
+UTfinal %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5)
+
+#get rid of NaCl and MgSO4 stress 
+UTfinal_alt <- UTfinal[!grepl("stress", UTfinal$experiment),]
+#get rid of NaCl and MgSO4 stress (non-unique fraction_avg)
+UTfinal_alt2 <- UTready[!grepl("stress", UTready$experiment),]
+
+UTfinal_alt2 %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+
+UTfinal_alt %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+Na concentrations and NaCl stress with untransformed data
+``` {r}
+#keep only ond samples on NaCL stress with unique Na concentrations (5,100,200,300)
+UTready %>% filter(experiment == 'NaCl_stress') %>% ungroup() %>% distinct(Na_mM, carbonSource,.keep_all = TRUE) -> UTNa
+
+UTNa %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction NaCl stress
+UTready %>% filter(experiment == 'NaCl_stress') %>% ungroup() -> UTa
+
+UTa %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+Mg concentrations and MgSO4 stress
+``` {r}
+#keep only ond samples on MgSO4 stress with unique Mg concentrations (0.08,0.8,8,200)
+UTready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() %>% distinct(Mg_mM, carbonSource,.keep_all = TRUE) -> UTMg
+
+UTMg %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction MgSO4 stress
+UTready %>% filter(experiment == 'MgSO4_stress_high') %>% ungroup() -> UTb
+
+UTb %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+```
