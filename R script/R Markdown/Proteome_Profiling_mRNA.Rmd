@@ -1,12 +1,53 @@
+---
+title: "Proteome_Profiling_mRNA"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# INITIAL COMMANDS TO RESET THE SYSTEM
+rm(list = ls())
+if (is.integer(dev.list())){dev.off()}
+cat("\014")
+seedNo=14159
+set.seed(seedNo)
+```
+## R Markdown
+
+```{r}
+#### required library and files
+
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(tidyr)
+library(stringr)
+library(readr)
+
+nameDictionary_RNA_Protein <-read_csv("~/Desktop/GitHub/proteome-profiling-ecoli/Files/nameDictionary_RNA_Protein.csv")
+
+metaData_mrna <- read_csv("~/Desktop/GitHub/proteome-profiling-ecoli/umut/metaData_mrna_trT_set00_StcAllEx_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noFilter_p1Sf_noNorm.csv")
+
+mRNA_untransformed  <- read_csv("~/Desktop/GitHub/proteome-profiling-ecoli/umut/resDf_mrna_trT_set00_StcAllEx_SYAN_baseMgAllMg_baseNaAllNa_ExpAllPhase_noFilter_p1Sf_noNorm.csv")
+
+```
+
+The following code is used to calculate and plot the ribosomal mRNA fraction of samples during exponential phase using untransformed data
+
+```{r}
 ####*********
 #changing column names 
 names(nameDictionary_RNA_Protein)[names(nameDictionary_RNA_Protein) == 'b#'] <- 'b'
-names(mRNA_untransformed)[names(mRNA_untransformed) == 'mRNA_id'] <- 'mRNA_ID'
+
+names(mRNA_untransformed)[names(mRNA_untransformed) == 'X1'] <- 'mRNA_ID'
 ####*********
 
 
 ####*********
-#join untransformed data to nameDictionary by mRNA_id
+#join untransformed data to nameDictionary by mRNA_ID
 mRNA_untransformed %>% left_join(nameDictionary_RNA_Protein, by = 'mRNA_ID') %>% subset(select = -c(Protein_id, b)) %>% select(mRNA_ID, gene_name, everything())-> UTmNames
 
 UTmNames %>% subset(select = (-c(mRNA_ID))) -> UTmNames
@@ -71,3 +112,33 @@ UTmfinal_alt2 <- UTmready[!grepl("stress", UTmready$experiment),]
 UTmfinal_alt2 %>% ggplot(aes(x=generations_per_hour, y=fraction, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
 
 UTmfinal_alt %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=carbonSource)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=media),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+Na concentrations and NaCl stress with untransformed data
+```{r}
+#keep only ond samples on NaCL stress with unique Na concentrations (5,100,200,300)
+UTmready %>% filter(experiment == 'NaCl_stress') %>% ungroup() %>% distinct(Na_mM, carbonSource,.keep_all = TRUE) -> UTmNa
+
+UTmNa %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction NaCl stress
+UTmready %>% filter(experiment == 'NaCl_stress') %>% ungroup() -> UTma
+
+UTma %>% ggplot(aes(x=generations_per_hour, y=fraction, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Na_mM),hjust='inward', vjust=1 , size= 5) 
+
+```
+
+
+Mg concentrations and MgSO4 stress
+``` {r}
+#keep only ond samples on MgSO4 stress with unique Mg concentrations 
+UTmready %>% filter(experiment == 'MgSO4_stress_high'| experiment == 'MgSO4_stress_low') %>% ungroup() %>% distinct(Mg_mM, carbonSource,.keep_all = TRUE) -> UTmMg
+
+UTmMg %>% ggplot(aes(x=generations_per_hour, y=fraction_avg, color=media)) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+
+#non-distinct ribosomal fraction MgSO4 stress
+UTmready %>% filter(experiment == 'MgSO4_stress_high'| experiment == 'MgSO4_stress_low') %>% ungroup() -> UTmb
+
+UTmb %>% ggplot(aes(x=generations_per_hour, y=fraction,color=Mg_mM_Levels )) + xlab('Generations per Hour') + ylab('Ribosomal Fraction') + geom_point() + geom_text(aes(label=Mg_mM),hjust='inward', vjust=1 , size= 5) 
+```
